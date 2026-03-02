@@ -113,20 +113,42 @@ python server.py
 
 ### How It Works
 
+```mermaid
+flowchart TD
+    A[User sends message] --> B[FastAPI /api/chat]
+    B --> C[Embed query via sentence-transformers]
+    C --> D[Search ChromaDB for top 5 chunks]
+    D --> E[Build system prompt with retrieved excerpts + employee context]
+    E --> F[Send to Groq API with tool definitions]
+    F --> G{finish_reason?}
+
+    G -- tool_calls --> H[Execute tool via mock_services.py]
+    H --> I[Append tool result to conversation]
+    I --> F
+
+    G -- stop --> J[Return final text response to user]
+
+    G -- error / malformed tool call --> K[Parse failed generation]
+    K --> L[Execute tool manually + retry without tools]
+    L --> J
+
+    style A fill:#e1f5fe
+    style J fill:#c8e6c9
+    style H fill:#fff3e0
+    style K fill:#ffebee
 ```
-User message
-    |
-FastAPI endpoint (/api/chat)
-    |
-Chatbot.chat() -- embeds query, retrieves relevant chunks from ChromaDB
-    |
-Build system prompt with retrieved excerpts + employee context
-    |
-Groq API call (with tool definitions)
-    |
-finish_reason == "tool_calls"?
-  YES -> execute tool(s) via mock_services.py -> append results -> loop back
-  NO  -> return final text response to user
+
+#### Startup / KB Reload
+
+```mermaid
+flowchart LR
+    A[Load PDFs, TXT, MD from knowledge_base/] --> B[Chunk documents ~500 tokens with overlap]
+    B --> C[Embed chunks via sentence-transformers]
+    C --> D[Store in ChromaDB persistent collection]
+    D --> E[Ready to serve queries]
+
+    style A fill:#e1f5fe
+    style E fill:#c8e6c9
 ```
 
 ### Key Design Decisions
