@@ -12,6 +12,34 @@ An AI-powered HR chatbot that answers employee questions using company documents
 
 ## Quick Start
 
+### Using uv (recommended)
+
+[uv](https://docs.astral.sh/uv/) is a fast Python package and project manager. It handles virtual environments and dependency installation in one step.
+
+```bash
+# 1. Clone and enter the project
+git clone <repo-url>
+cd Chatbot
+
+# 2. Install dependencies (creates .venv automatically)
+uv sync
+
+# 3. Set your Groq API key (free at https://console.groq.com)
+# Windows CMD:
+set GROQ_API_KEY=gsk_...
+# Windows PowerShell:
+$env:GROQ_API_KEY = "gsk_..."
+# macOS/Linux:
+export GROQ_API_KEY=gsk_...
+
+# 4. Start the server
+uv run python server.py
+
+# 5. Open http://localhost:8000
+```
+
+### Using pip
+
 ```bash
 # 1. Clone and enter the project
 git clone <repo-url>
@@ -63,8 +91,15 @@ python server.py
 ├── frontend.html          # Single-page app (chat + admin panel)
 ├── api_config.json        # MCP-inspired tool registry (toggleable)
 ├── mock_data.json         # Employee/holiday/budget mock data
-├── requirements.txt       # Python dependencies
-├── pyproject.toml         # Project metadata
+├── requirements.txt       # Python dependencies (pip)
+├── pyproject.toml         # Project metadata + uv config
+├── uv.lock                # uv lockfile (pinned dependency versions)
+├── tests/
+│   ├── test_document_loader.py  # Document loading tests
+│   ├── test_mock_services.py    # Mock service tests
+│   ├── test_rag_engine.py       # RAG chunking/retrieval tests
+│   ├── test_server.py           # FastAPI endpoint tests
+│   └── test_tools.py            # Tool config tests
 ├── .github/
 │   └── workflows/
 │       └── ci.yml         # GitHub Actions CI pipeline
@@ -174,6 +209,33 @@ The chatbot automatically picks up new tools on reload.
 
 Drop `.pdf`, `.txt`, or `.md` files into `knowledge_base/`, then click "Reload KB" in the admin panel (or restart the server).
 
+## Testing
+
+The project uses [pytest](https://docs.pytest.org/) with 77 tests covering all modules:
+
+```bash
+# Run all tests
+uv run pytest
+# or without uv:
+python -m pytest
+
+# Run with verbose output
+uv run pytest -v
+
+# Run a specific test file
+uv run pytest tests/test_rag_engine.py
+```
+
+| Test File | Coverage |
+|-----------|----------|
+| `test_document_loader.py` | Document loading, format support, error handling |
+| `test_mock_services.py` | All 4 HR services, dispatch registry, name lookup |
+| `test_rag_engine.py` | Chunking, indexing, retrieval (dental, vacation, security), formatting |
+| `test_server.py` | All API endpoints, admin/employee auth, CRUD operations |
+| `test_tools.py` | API config loading, Groq tool format, enable/disable |
+
+CI runs all tests automatically on push/PR via GitHub Actions (Python 3.11 + 3.12).
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -184,10 +246,13 @@ Drop `.pdf`, `.txt`, or `.md` files into `knowledge_base/`, then click "Reload K
 
 | Component | Technology |
 |-----------|-----------|
-| Backend | Python 3.11+, FastAPI, Uvicorn |
+| Runtime | Python 3.11+, [uv](https://docs.astral.sh/uv/) (package manager) |
+| Backend | [FastAPI](https://fastapi.tiangolo.com/) + Uvicorn |
 | LLM | Groq API (llama-3.3-70b-versatile) |
 | Embeddings | sentence-transformers (all-MiniLM-L6-v2, local) |
 | Vector Store | ChromaDB (persistent, file-based) |
 | PDF Parsing | pypdf |
 | Frontend | Vanilla HTML/CSS/JS (single file SPA) |
 | Auth | Cookie-based sessions (in-memory) |
+| Testing | [pytest](https://docs.pytest.org/) (77 tests) |
+| CI/CD | GitHub Actions (lint + test, Python 3.11/3.12) |

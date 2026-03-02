@@ -7,6 +7,7 @@ and ChromaDB. Handles document chunking, embedding, storage, and retrieval.
 
 import hashlib
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import chromadb
@@ -171,8 +172,25 @@ def index_documents(documents: list[Document]) -> int:
         embeddings=embeddings,
     )
 
+    _clear_embedding_cache()
     print(f"  Indexed {len(all_chunks)} chunks from {len(documents)} document(s).")
     return len(all_chunks)
+
+
+# ---- Embedding cache ----
+
+@lru_cache(maxsize=128)
+def _embed_query(query: str) -> tuple[list[float]]:
+    """Cache query embeddings to avoid re-encoding repeated/similar questions."""
+    model = _get_model()
+    vec = model.encode([query], show_progress_bar=False).tolist()[0]
+    # Return as tuple so it's hashable for lru_cache
+    return tuple(vec)
+
+
+def _clear_embedding_cache() -> None:
+    """Clear the query embedding cache (call after re-indexing)."""
+    _embed_query.cache_clear()
 
 
 # ---- Retrieval ----
@@ -187,8 +205,7 @@ def retrieve(query: str, top_k: int = TOP_K) -> list[dict]:
     if collection.count() == 0:
         return []
 
-    model = _get_model()
-    query_embedding = model.encode([query], show_progress_bar=False).tolist()
+    query_embedding = [list(_embed_query(query))]
 
     results = collection.query(
         query_embeddings=query_embedding,
