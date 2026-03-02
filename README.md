@@ -111,34 +111,74 @@ python server.py
 
 ## Architecture
 
-### How It Works
+### Employee Flow
 
 ```mermaid
 flowchart TD
-    A[User sends message] --> B[FastAPI /api/chat]
-    B --> C[Embed query via sentence-transformers]
-    C --> D[Search ChromaDB for top 5 chunks]
-    D --> E[Build system prompt with retrieved excerpts + employee context]
-    E --> F[Send to Groq API with tool definitions]
-    F --> G{finish_reason?}
+    A[Employee opens app] --> B{Logged in?}
+    B -- No --> C[Login with email + password]
+    C --> D[Session cookie set]
+    D --> E[Chat with HR Assistant]
+    B -- Yes --> E
 
-    G -- tool_calls --> H[Execute tool via mock_services.py]
-    H --> I[Append tool result to conversation]
-    I --> F
+    E --> F[Send message via /api/chat]
+    F --> G[RAG: Embed query + search ChromaDB for top 5 chunks]
+    G --> H[Build system prompt with excerpts + employee context]
+    H --> I[Send to Groq API with tool definitions]
+    I --> J{finish_reason?}
 
-    G -- stop --> J[Return final text response to user]
+    J -- tool_calls --> K[Execute tool via mock_services.py]
+    K --> L[Append tool result to conversation]
+    L --> I
 
-    G -- error / malformed tool call --> K[Parse failed generation]
-    K --> L[Execute tool manually + retry without tools]
-    L --> J
+    J -- stop --> M[Return response to employee]
+
+    J -- error / malformed tool call --> N[Parse failed generation]
+    N --> O[Execute tool manually + retry]
+    O --> M
+
+    E --> P[Logout]
 
     style A fill:#e1f5fe
-    style J fill:#c8e6c9
-    style H fill:#fff3e0
-    style K fill:#ffebee
+    style C fill:#e1f5fe
+    style M fill:#c8e6c9
+    style K fill:#fff3e0
+    style N fill:#ffebee
 ```
 
-#### Startup / KB Reload
+### Admin Flow
+
+```mermaid
+flowchart TD
+    A[Admin opens admin panel] --> B[Login with admin password]
+    B --> C[Admin Dashboard]
+
+    C --> D[Knowledge Base Management]
+    D --> D1[Upload PDF / TXT / MD]
+    D --> D2[Delete documents]
+    D --> D3[Reload KB]
+    D3 --> D4[Re-chunk + re-embed + store in ChromaDB]
+
+    C --> E[API Tool Configuration]
+    E --> E1[View all tools from api_config.json]
+    E --> E2[Toggle tools on/off]
+
+    C --> F[Mock Data Editor]
+    F --> F1[View employee / holiday / budget data]
+    F --> F2[Edit and save mock_data.json]
+
+    C --> G[Test Services]
+    G --> G1[Select tool + input params]
+    G --> G2[Execute mock service + view result]
+
+    style A fill:#e1f5fe
+    style B fill:#e1f5fe
+    style C fill:#fff3e0
+    style D4 fill:#c8e6c9
+    style G2 fill:#c8e6c9
+```
+
+### Startup / KB Reload
 
 ```mermaid
 flowchart LR
@@ -149,6 +189,27 @@ flowchart LR
 
     style A fill:#e1f5fe
     style E fill:#c8e6c9
+```
+
+### CI/CD Pipeline (GitHub Actions)
+
+Runs automatically on every push/PR to `main` (Python 3.11 + 3.12):
+
+```mermaid
+flowchart LR
+    A[Push / PR to main] --> B[Install dependencies]
+    B --> C[py_compile syntax check]
+    C --> D[Validate JSON configs]
+    D --> E[pytest -- 77 tests]
+    E --> F{All pass?}
+
+    F -- Yes --> G[Build succeeds]
+    F -- No --> H[Build fails]
+
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style G fill:#c8e6c9
+    style H fill:#ffebee
 ```
 
 ### Key Design Decisions
