@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check syntax (py_compile)
+        run: |
+          python -m py_compile server.py
+          python -m py_compile chatbot.py
+          python -m py_compile tools.py
+          python -m py_compile mock_services.py
+          python -m py_compile document_loader.py
+          python -m py_compile rag_engine.py
+          python -m py_compile main.py
+
+      - name: Validate JSON configs
+        run: |
+          python -c "import json; json.load(open('api_config.json')); print('api_config.json OK')"
+          python -c "import json; json.load(open('mock_data.json')); print('mock_data.json OK')"
+
+      - name: Test module imports
+        run: |
+          python -c "from document_loader import load_knowledge_base; print('document_loader OK')"
+          python -c "from tools import GROQ_TOOL_DEFINITIONS; print(f'tools OK: {len(GROQ_TOOL_DEFINITIONS)} tools loaded')"
+          python -c "from mock_services import SERVICE_REGISTRY; print(f'mock_services OK: {len(SERVICE_REGISTRY)} services')"
+          python -c "from rag_engine import retrieve, index_documents; print('rag_engine OK')"
+
+      - name: Test mock services
+        run: |
+          python -c "
+          from mock_services import call_service
+          r = call_service('get_vacation_balance', {'employee_id': 'E001'})
+          assert 'vacation_days_remaining' in r, f'Unexpected result: {r}'
+          print(f'Vacation balance: {r[\"vacation_days_remaining\"]} days remaining')
+
+          r = call_service('get_employee_info', {'employee_id': 'E001'})
+          assert r['name'] == 'Alice Mueller', f'Unexpected name: {r}'
+          print(f'Employee info: {r[\"name\"]}')
+
+          r = call_service('get_upcoming_holidays', {'country': 'DE'})
+          assert 'upcoming_holidays' in r, f'Unexpected result: {r}'
+          print(f'Holidays: {len(r[\"upcoming_holidays\"])} upcoming')
+
+          r = call_service('get_learning_budget', {'employee_id': 'E001'})
+          assert 'learning_budget_remaining_eur' in r, f'Unexpected result: {r}'
+          print(f'Learning budget remaining: EUR {r[\"learning_budget_remaining_eur\"]}')
+
+          print('All mock service tests passed')
+          "
+
+      - name: Test knowledge base loading
+        run: |
+          python -c "
+          from document_loader import load_knowledge_base
+          docs = load_knowledge_base('knowledge_base')
+          assert len(docs) >= 2, f'Expected at least 2 docs, got {len(docs)}'
+          names = [d.filename for d in docs]
+          print(f'Loaded {len(docs)} documents: {names}')
+          assert 'benefits_guide.txt' in names
+          assert 'company_handbook.md' in names
+          print('Knowledge base tests passed')
+          "
+
+      - name: Test RAG engine
+        run: |
+          python -c "
+          from document_loader import load_knowledge_base
+          from rag_engine import chunk_document, index_documents, retrieve, format_retrieved_context
+
+          # Test chunking
+          docs = load_knowledge_base('knowledge_base')
+          for doc in docs:
+              chunks = chunk_document(doc)
+              print(f'{doc.filename}: {len(chunks)} chunk(s)')
+              assert len(chunks) >= 1, f'Expected at least 1 chunk for {doc.filename}'
+              for c in chunks:
+                  assert c['source'] == doc.filename
+                  assert len(c['text']) > 0
+
+          # Test indexing
+          count = index_documents(docs)
+          assert count >= 3, f'Expected at least 3 chunks total, got {count}'
+          print(f'Indexed {count} chunks')
+
+          # Test retrieval
+          results = retrieve('vacation days policy')
+          assert len(results) > 0, 'Expected at least 1 result'
+          print(f'Retrieved {len(results)} chunks for vacation query')
+
+          # Test source metadata
+          for r in results:
+              assert 'source' in r
+              assert 'text' in r
+              assert 'score' in r
+
+          # Test formatting
+          formatted = format_retrieved_context(results)
+          assert '[Source:' in formatted
+          print('Context formatting OK')
+
+          # Test empty query handling
+          empty = format_retrieved_context([])
+          assert 'No relevant' in empty
+
+          print('All RAG engine tests passed')
+          "
+
+      - name: Test tool definitions
+        run: |
+          python -c "
+          from tools import load_api_config, build_groq_tool_definitions
+          config = load_api_config()
+          assert len(config['tools']) == 4, f'Expected 4 tools, got {len(config[\"tools\"])}'
+          defs = build_groq_tool_definitions(config)
+          assert len(defs) == 4, f'Expected 4 enabled tools, got {len(defs)}'
+          for d in defs:
+              assert d['type'] == 'function'
+              assert 'name' in d['function']
+              assert 'description' in d['function']
+          print(f'Tool definitions OK: {[d[\"function\"][\"name\"] for d in defs]}')
+          "
+
+      - name: Test FastAPI app starts
+        run: |
+          python -c "
+          import os
+          os.environ.setdefault('GROQ_API_KEY', 'gsk_test_dummy_key')
+          from server import app
+          from fastapi.testclient import TestClient
+          client = TestClient(app)
+
+          # Frontend
+          r = client.get('/')
+          assert r.status_code == 200, f'Frontend failed: {r.status_code}'
+          assert 'Trenkwalder' in r.text
+          print('Frontend serves OK')
+
+          # Admin login
+          r = client.post('/api/admin/login', json={'password': '1243'})
+          assert r.status_code == 200
+          cookies = r.cookies
+          print('Admin login OK')
+
+          # API config
+          r = client.get('/api/admin/api-config', cookies=cookies)
+          assert r.status_code == 200
+          assert len(r.json()['tools']) == 4
+          print('API config endpoint OK')
+
+          # Mock data
+          r = client.get('/api/admin/mock-data', cookies=cookies)
+          assert r.status_code == 200
+          assert 'E001' in r.json()['employees']
+          print('Mock data endpoint OK')
+
+          # Test service
+          r = client.post('/api/admin/test-service/get_vacation_balance',
+                          json={'params': {'employee_id': 'E001'}}, cookies=cookies)
+          assert r.status_code == 200
+          assert r.json()['status'] == 'ok'
+          print('Test service endpoint OK')
+
+          # Employee login
+          r = client.post('/api/employee/login',
+                          json={'email': 'alice@trenkwalder.com', 'password': 'alice123'})
+          assert r.status_code == 200
+          assert r.json()['name'] == 'Alice Mueller'
+          print('Employee login OK')
+
+          # KB files
+          r = client.get('/api/admin/files', cookies=cookies)
+          assert r.status_code == 200
+          print('KB files endpoint OK')
+
+          print('All FastAPI endpoint tests passed')
+          "

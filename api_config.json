@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "description": "MCP-inspired tool/API configuration for the HR chatbot. Each tool defines a capability the chatbot can invoke to fetch dynamic data.",
+  "tools": [
+    {
+      "name": "get_vacation_balance",
+      "enabled": true,
+      "description": "Get the current vacation day balance for the logged-in employee. Use when the user asks about vacation days, time off remaining, PTO balance, or how many days they have left.",
+      "category": "HR",
+      "mock_source": "mock_data.json",
+      "production_endpoint": "https://hr-api.trenkwalder.com/v1/vacation/{employee_id}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "description": "Employee ID. Defaults to logged-in user (E001)."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_upcoming_holidays",
+      "enabled": true,
+      "description": "Get upcoming public holidays. Use when the user asks about public holidays, bank holidays, or national days off.",
+      "category": "Calendar",
+      "mock_source": "mock_data.json",
+      "production_endpoint": "https://holidays-api.trenkwalder.com/v1/holidays/{country}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "ISO country code e.g. 'DE' for Germany. Defaults to 'DE'."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_learning_budget",
+      "enabled": true,
+      "description": "Get the remaining learning & development budget. Use when the user asks about training budget, L&D, conference budget, or money left for courses or books.",
+      "category": "Finance",
+      "mock_source": "mock_data.json",
+      "production_endpoint": "https://finance-api.trenkwalder.com/v1/learning-budget/{employee_id}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "description": "Employee ID. Defaults to logged-in user (E001)."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_employee_info",
+      "enabled": true,
+      "description": "Get general employee information: department, start date, manager, job grade. Use for questions like 'who is my manager?' or 'when did I start?'.",
+      "category": "HR",
+      "mock_source": "mock_data.json",
+      "production_endpoint": "https://hr-api.trenkwalder.com/v1/employee/{employee_id}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "description": "Employee ID. Defaults to logged-in user (E001)."
+          }
+        },
+        "required": []
+      }
+    }
+  ]
+}

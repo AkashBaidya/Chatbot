@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "description": "Mock HR data for Trenkwalder HR Assistant. Edit via Admin Panel or directly.",
+  "default_employee_id": "E001",
+  "employees": {
+    "E001": {
+      "name": "Alice Mueller",
+      "email": "alice@trenkwalder.com",
+      "password": "alice123",
+      "department": "Recruitment",
+      "start_date": "2022-03-15",
+      "vacation_days_total": 25,
+      "vacation_days_used": 14,
+      "sick_days_this_year": 2,
+      "manager": "Bob Schmidt",
+      "salary_grade": "IC4"
+    },
+    "E002": {
+      "name": "Bob Schmidt",
+      "email": "bob@trenkwalder.com",
+      "password": "bob123",
+      "department": "Staffing Solutions",
+      "start_date": "2019-07-01",
+      "vacation_days_total": 28,
+      "vacation_days_used": 20,
+      "sick_days_this_year": 0,
+      "manager": "Carol Chen",
+      "salary_grade": "M2"
+    }
+  },
+  "holidays": {
+    "DE": [
+      {"date": "2026-01-01", "name": "New Year's Day"},
+      {"date": "2026-04-03", "name": "Good Friday"},
+      {"date": "2026-04-06", "name": "Easter Monday"},
+      {"date": "2026-05-01", "name": "Labour Day"},
+      {"date": "2026-05-14", "name": "Ascension Day"},
+      {"date": "2026-05-25", "name": "Whit Monday"},
+      {"date": "2026-10-03", "name": "German Unity Day"},
+      {"date": "2026-12-25", "name": "Christmas Day"},
+      {"date": "2026-12-26", "name": "Boxing Day"}
+    ]
+  },
+  "learning_budget": {
+    "total_eur": 1500.0,
+    "spent_range_min": 200,
+    "spent_range_max": 900
+  }
+}
